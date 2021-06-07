@@ -1,0 +1,43 @@
+  
+# Example of writing an ASCII character from a file to the TIM with PIO control of data and control lines
+# for a more wrapped-up examples, see https://github.com/raspberrypi/pico-micropython-examples/blob/master/pio/pio_pwm.py
+
+from machine import Pin
+from rp2 import PIO, StateMachine, asm_pio
+from time import sleep
+
+#outputs a byte through 8 GPIO pins and set the data ready high
+@asm_pio(sideset_init=PIO.OUT_LOW, out_init=(rp2.PIO.OUT_LOW,) * 8, out_shiftdir=PIO.SHIFT_RIGHT, 
+ autopull=True, pull_thresh=16 )
+def paral_prog():
+    pull()                  #pull data from the transmit SR      
+    out(pins, 8)  .side(1)  #output data to 8 pins and set "data ready" line high
+    wait(1, pin, 0)         #wait for the "data taken" line to go high
+    nop()         .side(0)  #set the "data ready" line low
+
+
+paral_sm = StateMachine(0, paral_prog, freq=1000000, sideset_base=Pin(7), out_base=Pin(8), in_base=Pin(6))
+#parallel data out pins 8-15, "data ready" side-set out-pin 7, "data taken" in-pin 6
+paral_sm.active(1)          #Activates paral_sm program in first PIO 
+
+value = input("press enter to start file transfer:\n")
+# Open the desired file
+f = open('ehbasic.txt','r')
+
+mychartxt = f.read(1)           # Read the first Byte
+
+# Entering the main loop, will loop until EOF
+while mychartxt:
+      if mychartxt == ';':
+        print('.', end=' ')
+      paral_sm.put(mychartxt)         # Output the next Byte
+      mychartxt = f.read(1)           # Read the next Byte
+
+# At EOF, clean up
+f.close()
+print ('EOF')
+
+
+
+
+
